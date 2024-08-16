@@ -3,7 +3,6 @@ name: Build
 on:
   push:
     branches:
-      - master
       - develop
 
   release:
@@ -14,32 +13,62 @@ on:
 jobs:
   build:
     name: Build
-    if: github.repository == 'xibosignage/xibo-xmr'
+    # if: github.repository == 'xibosignage/xibo-xmr'
     runs-on: ubuntu-22.04
     steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Checkout
         uses: actions/checkout@v1
         with:
           fetch-depth: 1
 
-      - name: Login
-        run: |
-          docker login ghcr.io --username ${{ github.actor }} --password ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Latest
-        if: github.ref == 'refs/heads/master'
-        run: |
-          docker build . -t ghcr.io/xibosignage/xibo-xmr:latest
-          docker push ghcr.io/xibosignage/xibo-xmr:latest
+      # - name: Login
+      #   run: |
+      #     docker login ghcr.io --username ${{ github.actor }} --password ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Develop
-        if: github.ref == 'refs/heads/develop'
-        run: |
-          docker build . -t ghcr.io/xibosignage/xibo-xmr:develop
-          docker push ghcr.io/xibosignage/xibo-xmr:develop
+      # - name: Build Latest
+      #   if: github.ref == 'refs/heads/master'
+      #   run: |
+      #     docker build . -t ghcr.io/xibosignage/xibo-xmr:latest
+      #     docker push ghcr.io/xibosignage/xibo-xmr:latest
 
-      - name: Build Release
-        if: github.event_name == 'release'
-        run: |
-          docker build . -t ghcr.io/xibosignage/xibo-xmr:${GITHUB_REF##*/}
-          docker push ghcr.io/xibosignage/xibo-xmr:${GITHUB_REF##*/}
+      # - name: Build Develop
+      #   if: github.ref == 'refs/heads/develop'
+      #   run: |
+      #     docker build . -t ghcr.io/xibosignage/xibo-xmr:develop
+      #     docker push ghcr.io/xibosignage/xibo-xmr:develop
+
+      # - name: Build Release
+      #   if: github.event_name == 'release'
+      #   run: |
+      #     docker build . -t ghcr.io/xibosignage/xibo-xmr:${GITHUB_REF##*/}
+      #     docker push ghcr.io/xibosignage/xibo-xmr:${GITHUB_REF##*/}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ghcr.io/store-genius/xibo-xmr:latest
+
+      - name: Build and push Docker image
+        id: push
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/store-genius/xibo-xmr:latest
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache,new=true
